@@ -2,6 +2,8 @@ const express = require('express')
 const app = express()
 const morgan = require('morgan')
 
+const fs = require('fs')
+
 morgan.token('body', req => JSON.stringify(req.body))
 
 app.use(express.json())
@@ -31,6 +33,28 @@ let persons = [
   }
 ]
 
+// TODO: write data to .json file to persist
+const file = 'persons.json'
+if (fs.existsSync(file)) {
+  try {
+    const data = fs.readFileSync(file, 'utf8')
+    let parsedData = JSON.parse(data)
+    if (parsedData.length === 0) {
+      persons = persons.concat(parsedData)
+    } else {
+      persons = parsedData
+    }
+  } catch (err) {
+    console.error(err)
+  }
+}
+
+const savePersons = () => {
+  fs.writeFile(file, JSON.stringify(persons, null, 2), (err) => {
+    if (err) console.error(err)
+  })
+}
+
 app.get('/api/persons', (req, res) => {
   res.json(persons)
 })
@@ -57,6 +81,7 @@ app.get('/api/persons/:id', (req, res) => {
 app.delete('/api/persons/:id', (req, res) => {
   const id = req.params.id
   persons = persons.filter(person => person.id !== id)
+  savePersons()
   res.status(204).end()
 })
 
@@ -92,6 +117,8 @@ app.post('/api/persons/', (req, res) => {
   }
 
   persons = persons.concat(person)
+
+  savePersons()
 
   res.json(person)
 })
