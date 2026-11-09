@@ -1,129 +1,87 @@
-const express = require('express')
-const app = express()
-const morgan = require('morgan')
+const express = require("express");
+const app = express();
+const morgan = require("morgan");
+require("dotenv").config();
+const Entry = require("./models/entry");
 
-const fs = require('fs')
+morgan.token("body", (req) => JSON.stringify(req.body));
 
-morgan.token('body', req => JSON.stringify(req.body))
+app.use(express.json());
+app.use(
+  morgan(":method :url :status :res[content-length] - :response-time ms :body"),
+);
+app.use(express.static("dist"));
 
-app.use(express.json())
-app.use(morgan(':method :url :status :res[content-length] - :response-time ms :body'))
-app.use(express.static('dist'))
+app.get("/api/persons", (req, res) => {
+  Entry.find({}).then((persons) => {
+    res.json(persons);
+  });
+});
 
-let persons = [
-  {
-    "id": "1",
-    "name": "Arto Hellas",
-    "number": "040-123456"
-  },
-  {
-    "id": "2",
-    "name": "Ada Lovelace",
-    "number": "39-44-5323523"
-  },
-  {
-    "id": "3",
-    "name": "Dan Abramov",
-    "number": "12-43-234345"
-  },
-  {
-    "id": "4",
-    "name": "Mary Poppendieck",
-    "number": "39-23-6423122"
-  }
-]
+app.get("/info", (req, res) => {
+  const timestamp = Date.now();
+  const date = new Date(timestamp);
+  Entry.find({}).then((persons) => {
+    res.send(
+      `<div>Phonebook has info for ${persons.length} people</div><br>${date}`,
+    );
+  });
+});
 
-// TODO: write data to .json file to persist
-const file = 'persons.json'
-if (fs.existsSync(file)) {
-  try {
-    const data = fs.readFileSync(file, 'utf8')
-    let parsedData = JSON.parse(data)
-    if (parsedData.length === 0) {
-      persons = persons.concat(parsedData)
-    } else {
-      persons = parsedData
-    }
-  } catch (err) {
-    console.error(err)
-  }
-}
+app.get("/api/persons/:id", (req, res) => {
+  Entry.findById(req.params.id)
+    .then((entry) => {
+      res.json(entry);
+    })
+    .catch((error) => {
+      res.statusMessage = `Person with id ${req.params.id} doesn't exist`;
+      res.status(404).end();
+    });
+});
 
-const savePersons = () => {
-  fs.writeFile(file, JSON.stringify(persons, null, 2), (err) => {
-    if (err) console.error(err)
-  })
-}
+app.delete("/api/persons/:id", (req, res) => {
+  Entry.findByIdAndDelete(req.params.id)
+    .then((entry) => {
+      res.status(204).end();
+    })
+    .catch((error) => {
+      res.status(204).end();
+    });
+});
 
-app.get('/api/persons', (req, res) => {
-  res.json(persons)
-})
-
-app.get('/info', (req, res) => {
-  const timestamp = Date.now()
-  const date = new Date(timestamp)
-  let responseText = 
-    `<div>Phonebook has info for ${persons.length} people</div><br>${date}`
-  res.send(responseText)
-})
-
-app.get('/api/persons/:id', (req, res) => {
-  const id = req.params.id
-  const person = persons.find(person => person.id === id)
-  if (person) {
-    res.json(person)
-  } else {
-    res.statusMessage = `Person with id ${id} doesn't exist`
-    res.status(404).end()
-  }
-})
-
-app.delete('/api/persons/:id', (req, res) => {
-  const id = req.params.id
-  persons = persons.filter(person => person.id !== id)
-  savePersons()
-  res.status(204).end()
-})
-
-const generateId = () => {
-  const id =  Math.floor(Math.random() * Number.MAX_VALUE)
-  return String(id)
-}
-
-app.post('/api/persons/', (req, res) => {
-  const body = req.body
+app.post("/api/persons/", (req, res) => {
+  const body = req.body;
   if (!body) {
     return res.status(400).json({
-      error: 'content missing'
-    })
+      error: "content missing",
+    });
   }
 
   if (!body.name || !body.number) {
     return res.status(400).json({
-      error: 'name or number is missing'
-    })
+      error: "name or number is missing",
+    });
   }
 
-  if (persons.some(person => person.name === body.name)) {
-    return res.status(400).json({
-      error: `name '${body.name}' already exists`
-    })
-  }
+  Entry.find({}).then((persons) => {
+    if (persons.some((person) => person.name === body.name)) {
+      return res.status(400).json({
+        error: `name '${body.name}' already exists`,
+      });
+    }
+  });
 
-  const person = {
-    id: generateId(),
+  const person = new Entry({
     name: body.name,
     number: body.number,
-  }
+  });
 
-  persons = persons.concat(person)
+  person.save().then((person) => {
+    res.json(person);
+  });
+});
 
-  savePersons()
-
-  res.json(person)
-})
-
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-})
+  console.log(`Server running on port ${PORT}`);
+});
