@@ -12,6 +12,16 @@ app.use(
 );
 app.use(express.static("dist"));
 
+const errorHandling = (err, req, res, next) => {
+  console.log(err);
+
+  if (err.name === "CastError") {
+    res.status(400).send({ error: "malformed id" });
+  }
+
+  next(err);
+};
+
 app.get("/api/persons", (req, res) => {
   Entry.find({}).then((persons) => {
     res.json(persons);
@@ -21,22 +31,21 @@ app.get("/api/persons", (req, res) => {
 app.get("/info", (req, res) => {
   const timestamp = Date.now();
   const date = new Date(timestamp);
-  Entry.find({}).then((persons) => {
-    res.send(
-      `<div>Phonebook has info for ${persons.length} people</div><br>${date}`,
-    );
+  Entry.estimatedDocumentCount().then((count) => {
+    res.send(`<div>Phonebook has info for ${count} people</div><br>${date}`);
   });
 });
 
-app.get("/api/persons/:id", (req, res) => {
+app.get("/api/persons/:id", (req, res, next) => {
   Entry.findById(req.params.id)
     .then((entry) => {
-      res.json(entry);
+      if (entry) {
+        res.json(entry);
+      } else {
+        res.status(404).end();
+      }
     })
-    .catch((error) => {
-      res.statusMessage = `Person with id ${req.params.id} doesn't exist`;
-      res.status(404).end();
-    });
+    .catch((error) => next(error));
 });
 
 app.delete("/api/persons/:id", (req, res) => {
@@ -44,9 +53,7 @@ app.delete("/api/persons/:id", (req, res) => {
     .then((entry) => {
       res.status(204).end();
     })
-    .catch((error) => {
-      res.status(204).end();
-    });
+    .catch((error) => next(error));
 });
 
 app.post("/api/persons/", (req, res) => {
@@ -63,14 +70,6 @@ app.post("/api/persons/", (req, res) => {
     });
   }
 
-  Entry.find({}).then((persons) => {
-    if (persons.some((person) => person.name === body.name)) {
-      return res.status(400).json({
-        error: `name '${body.name}' already exists`,
-      });
-    }
-  });
-
   const person = new Entry({
     name: body.name,
     number: body.number,
@@ -80,6 +79,27 @@ app.post("/api/persons/", (req, res) => {
     res.json(person);
   });
 });
+
+app.put("/api/persons/:id", (req, res, next) => {
+  const { name, number } = req.body;
+
+  Entry.findById(req.params.id)
+    .then((entry) => {
+      if (!entry) {
+        return res.status(404).end();
+      }
+
+      entry.name = name;
+      entry.number = number;
+
+      return entry.save().then((updatedEntry) => {
+        res.json(updatedEntry);
+      });
+    })
+    .catch((err) => next(err));
+});
+
+app.use(errorHandling);
 
 const PORT = process.env.PORT;
 app.listen(PORT, () => {
