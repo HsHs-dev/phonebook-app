@@ -50,9 +50,9 @@ app.get("/api/persons/:id", (req, res, next) => {
     .catch((error) => next(error));
 });
 
-app.delete("/api/persons/:id", (req, res) => {
+app.delete("/api/persons/:id", (req, res, next) => {
   Entry.findByIdAndDelete(req.params.id)
-    .then((entry) => {
+    .then(() => {
       res.status(204).end();
     })
     .catch((error) => next(error));

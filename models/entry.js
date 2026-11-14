@@ -6,7 +6,7 @@ mongoose.set("strictQuery", false);
 
 mongoose
   .connect(url, { family: 4 })
-  .then((result) => {
+  .then(() => {
     console.log("connected to mongoDB");
   })
   .catch((error) => {
