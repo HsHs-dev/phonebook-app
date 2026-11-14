@@ -17,6 +17,8 @@ const errorHandling = (err, req, res, next) => {
 
   if (err.name === "CastError") {
     res.status(400).send({ error: "malformed id" });
+  } else if (err.name === "ValidationError") {
+    return res.status(400).json({ error: err.message });
   }
 
   next(err);
@@ -56,7 +58,7 @@ app.delete("/api/persons/:id", (req, res) => {
     .catch((error) => next(error));
 });
 
-app.post("/api/persons/", (req, res) => {
+app.post("/api/persons/", (req, res, next) => {
   const body = req.body;
   if (!body) {
     return res.status(400).json({
@@ -75,9 +77,12 @@ app.post("/api/persons/", (req, res) => {
     number: body.number,
   });
 
-  person.save().then((person) => {
-    res.json(person);
-  });
+  person
+    .save()
+    .then((person) => {
+      res.json(person);
+    })
+    .catch((err) => next(err));
 });
 
 app.put("/api/persons/:id", (req, res, next) => {
